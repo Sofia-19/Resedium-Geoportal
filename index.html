@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ReSeDiUm · Geoportal</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="mark">SA</div>
+  <div class="brand">
+    <small>RESEDIUM · GEOINFORMATION</small>
+    <h1 id="projectTitle">Satelliten- und Sprachdaten für die Analyse nutzbarer Landflächen</h1>
+    <p id="projectSubtitle">Sachsen-Anhalt · 2020–2025</p>
+  </div>
+  <button id="language" class="lang-button" aria-label="Switch language">EN</button>
+</header>
+<main>
+  <aside class="layers-panel">
+    <small data-i18n="explorer">KARTENEXPLORER</small>
+    <h2 data-i18n="explore">Gebiet erkunden</h2>
+    <p class="muted" data-i18n="exploreHint">Kartenprodukte und Jahre auswählen. Mehrere Ebenen können gleichzeitig angezeigt werden.</p>
+
+    <div class="layer-tree" id="layerTree">
+      <details open class="tree-group">
+        <summary data-i18n="pixelLevel">Pixel level</summary>
+        <div class="tree-subgroup">
+          <details open>
+            <summary data-i18n="lulc">Landbedeckung (LULC)</summary>
+            <div class="year-list" id="pixel-lulc"></div>
+          </details>
+          <details>
+            <summary data-i18n="forestState">Waldzustand</summary>
+            <div class="year-list" id="pixel-forest"></div>
+          </details>
+          <details>
+            <summary data-i18n="biomass">Oberirdische Biomasse</summary>
+            <div class="year-list" id="pixel-biomass"></div>
+          </details>
+          <details>
+            <summary data-i18n="ndvi">Median-NDVI</summary>
+            <div class="year-list" id="pixel-ndvi"></div>
+          </details>
+          <details open>
+            <summary data-i18n="thematicIndicators">Thematische Indikatoren</summary>
+            <div class="year-list" id="pixel-thematic"></div>
+          </details>
+        </div>
+      </details>
+      <details class="tree-group">
+        <summary data-i18n="municipalityLevel">Municipality level</summary>
+        <div class="tree-subgroup">
+          <details open>
+            <summary data-i18n="lulc">Landbedeckung (LULC)</summary>
+            <div class="year-list" id="municipal-lulc"></div>
+          </details>
+          <details>
+            <summary data-i18n="forestState">Waldzustand</summary>
+            <div class="year-list" id="municipal-forest"></div>
+          </details>
+          <details>
+            <summary data-i18n="cropDiversity">Kulturartenvielfalt (Kulturen ≥ 50 ha)</summary>
+            <div class="year-list one-column" id="municipal-crop"></div>
+          </details>
+          <details open>
+            <summary data-i18n="thematicIndicators">Thematische Indikatoren</summary>
+            <div class="year-list one-column" id="municipal-thematic"></div>
+          </details>
+        </div>
+      </details>
+    </div>
+
+    <label for="opacity"><span data-i18n="opacity">Deckkraft</span><span id="opacityValue">85%</span></label>
+    <input id="opacity" type="range" min="10" max="100" value="85">
+    <div id="municipality-outline-control" class="outline-control"></div>
+    <button id="clearLayers" class="secondary-button" data-i18n="clearLayers">Alle Themenebenen ausschalten</button>
+  </aside>
+
+  <section class="map-panel">
+    <div class="map-head">
+      <div><small data-i18n="interactiveMap">INTERAKTIVE KARTE</small><h2 id="mapTitle">ReSeDiUm · Karte</h2></div>
+      <button id="reset" data-i18n="resetView">Ansicht zurücksetzen</button>
+    </div>
+    <div id="map"></div>
+    <div class="map-note" id="mapNote" data-i18n="mapNote">Wählen Sie links eine oder mehrere Kartenebenen aus.</div>
+  </section>
+  <aside class="municipality-stats">    <hr>
+    <h3 data-i18n="areaStats">Gebietsstatistik</h3>
+    <p class="muted" data-i18n="municipalityHint">Gemeinde auswählen, sobald Gemeindegrenzen und Statistikdaten eingebunden sind.</p>
+    <div class="stat"><small data-i18n="selectedArea">Ausgewähltes Gebiet</small><strong id="regionName" data-i18n="noneSelected">Keine Auswahl</strong></div>
+    <div class="stat"><small data-i18n="lulcArea">Ausgewählte Produktwerte</small><div id="selectedProductStats"><span class="muted">—</span></div></div>
+    <div class="stat"><small data-i18n="permanentGrassland">Dauergrünland (5/6 Jahre)</small><strong id="permanentGrasslandArea">—</strong></div>
+    <div class="stat"><small data-i18n="grasslandConversion">Grünlandumwandlung (GGGCCC)</small><strong id="grasslandConversionArea">—</strong></div>
+  </aside>
+
+  <aside class="analytics">
+    <small data-i18n="analytics">ANALYSIS</small>
+    <h2 data-i18n="areaOverview">Time-series analysis</h2>
+    <div class="analysis-controls">
+      <label for="analysisScope">Territory</label>
+      <select id="analysisScope"><option value="region">Whole region</option><option value="municipality">Selected municipality</option></select>
+      <label for="analysisProduct">Indicator</label>
+      <select id="analysisProduct"><option value="lulc">LULC area (ha)</option><option value="biomass">Above-ground biomass</option><option value="ndvi">NDVI</option></select>
+      <label id="analysisClassLabel">Culture / class</label>
+      <div id="analysisClassMultiSelect" class="multi-select" aria-describedby="analysisClassHint">
+        <button type="button" id="analysisClassToggle" class="multi-select-toggle">Select classes ▾</button>
+        <div class="multi-select-menu" role="group" aria-label="Select classes"></div>
+      </div>
+      <p id="analysisClassHint" class="control-hint">Select one or more classes from the dropdown.</p>
+      <select id="analysisClasses" multiple hidden aria-hidden="true" tabindex="-1"></select>
+    </div>
+    <div id="analysisChart" class="analysis-chart"></div>
+    <p id="analysisNote" class="muted">Area by selected LULC class and year.</p>
+  </aside>
+</main>
+<footer class="funding">
+  <strong data-i18n="funding">Förderung</strong>
+  <p id="fundingText">Diese Arbeit wurde durch den Europäischen Fonds für regionale Entwicklung (EFRE) und das Land Sachsen-Anhalt im Rahmen des Programms „Sachsen-Anhalt WISSENSCHAFT – Forschung und Innovation (EFRE) 2021–2027“ im Projekt ReSeDiUm (Förderkennzeichen ZS/2023/12/182669) unterstützt.</p>
+</footer>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
