@@ -135,15 +135,17 @@ let selectedMunicipalityId = null; // legacy ID convention for LULC/Forest (fid 
 let selectedMunicipalityNdviId = null; // NDVI JSON uses GeoJSON fid directly
 const legendNodes = new Map();
 
+const R2_DATA_BASE = 'https://pub-fd0300ff7baf474aaf2264f1d5292e48.r2.dev/data';
+
 function layerId(level, product, year) { return `${level}-${product}-${year ?? 'all'}`; }
 function layerUrl(config, year) {
   if (config.static) {
-    if (config.product === 'permanent') return 'data/pmtiles/Permanent_Grassland.pmtiles';
-    if (config.product === 'conversion') return 'data/pmtiles/Grassland_Conversion.pmtiles';
+    if (config.product === 'permanent') return `${R2_DATA_BASE}/pmtiles/Permanent_Grassland.pmtiles`;
+    if (config.product === 'conversion') return `${R2_DATA_BASE}/pmtiles/Grassland_Conversion.pmtiles`;
   }
-  if (config.product === 'lulc') return `data/pmtiles/LULC_class/LULC_class_SachsenAnhalt_${year}.pmtiles`;
-  if (config.product === 'forest') return `data/pmtiles/Forest_State/Forest_State_${year}.pmtiles`;
-  if (config.product === 'ndvi') return `data/pmtiles/NDVI/NDVI_${year}.pmtiles`;
+  if (config.product === 'lulc') return `${R2_DATA_BASE}/pmtiles/LULC_class/LULC_class_SachsenAnhalt_${year}.pmtiles`;
+  if (config.product === 'forest') return `${R2_DATA_BASE}/pmtiles/Forest_State/Forest_State_${year}.pmtiles`;
+  if (config.product === 'ndvi') return `${R2_DATA_BASE}/pmtiles/NDVI/NDVI_${year}.pmtiles`;
   throw new Error(`No PMTiles path configured for ${config.product}`);
 }
 function productName(product) { return I18N[language].products[product]; }
@@ -995,13 +997,15 @@ function updateAnalytics() {
 async function fetchJsonFirst(paths, required = false) {
   let lastError = null;
   for (const path of paths) {
+    // Prefer the matching object in R2 for data files; keep legacy local paths as fallback.
+    const sourcePath = path.startsWith('data/') ? `${R2_DATA_BASE}/${path.slice(5)}` : path;
     try {
-      const response = await fetch(path);
-      if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
+      const response = await fetch(sourcePath);
+      if (!response.ok) throw new Error(`${sourcePath}: HTTP ${response.status}`);
       return await response.json();
     } catch (error) {
       lastError = error;
-      console.warn(`Could not load ${path}:`, error);
+      console.warn(`Could not load ${sourcePath}:`, error);
     }
   }
   if (required) throw (lastError || new Error(`Could not load ${paths[0]}`));
