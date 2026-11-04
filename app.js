@@ -19,7 +19,7 @@ const FOREST_CLASSES = [
 
 const I18N = {
   de: {
-    projectTitle:'Satelliten- und Sprachdaten für die Analyse nutzbarer Landflächen', subtitle:'Sachsen-Anhalt · 2020–2025',
+    projectTitle:'ReSeDiUm: Satelliten- und Sprachdaten für die Analyse nutzbarer Landflächen', subtitle:'Sachsen-Anhalt · 2024–2027',
     explorer:'KARTENEXPLORER', explore:'Gebiet erkunden', exploreHint:'Kartenprodukte und Jahre auswählen. Mehrere Ebenen können gleichzeitig angezeigt werden.',
     pixelLevel:'Pixel-Ebene', municipalityLevel:'Gemeindeebene', lulc:'Landbedeckung (LULC)', forestState:'Waldzustand', biomass:'Oberirdische Biomasse', ndvi:'Median-NDVI', thematicIndicators:'Thematische Indikatoren', permanentGrassland:'Dauergrünland (mind. 5 Jahre)', grasslandConversion:'Grassland 2020–2022 → Cropland 2023–2025', cropDiversity:'Kulturartenvielfalt (Kulturen ≥ 50 ha)',
     opacity:'Deckkraft', clearLayers:'Alle Themenebenen ausschalten', areaStats:'Gebietsstatistik', municipalityHint:'Gemeinde anklicken, um die zugehörigen Kennzahlen anzuzeigen.',
@@ -32,7 +32,7 @@ const I18N = {
     fundingText:'Diese Arbeit wurde durch den Europäischen Fonds für regionale Entwicklung (EFRE) und das Land Sachsen-Anhalt im Rahmen des Programms „Sachsen-Anhalt WISSENSCHAFT – Forschung und Innovation (EFRE) 2021–2027“ im Projekt ReSeDiUm (Förderkennzeichen ZS/2023/12/182669) unterstützt.'
   },
   en: {
-    projectTitle:'Satellite and speech data for usable land assessment', subtitle:'Saxony-Anhalt · 2020–2025',
+    projectTitle:'ReSeDiUm: Satellite and speech data for usable land assessment', subtitle:'Saxony-Anhalt · 2024–2027',
     explorer:'MAP EXPLORER', explore:'Explore the area', exploreHint:'Choose map products and years. Multiple layers can be displayed at the same time.',
     pixelLevel:'Pixel level', municipalityLevel:'Municipality level', lulc:'Land cover (LULC)', forestState:'Forest condition', biomass:'Above-ground biomass', ndvi:'Median NDVI', thematicIndicators:'Thematic indicators', permanentGrassland:'Permanent grassland (at least 5 years)', grasslandConversion:'Grassland 2020–2022 → Cropland 2023–2025', cropDiversity:'Crop diversity (crops ≥ 50 ha)',
     opacity:'Opacity', clearLayers:'Turn off all thematic layers', areaStats:'Area statistics', municipalityHint:'Click a municipality to view its statistics.',
@@ -47,19 +47,73 @@ const I18N = {
 
 let language = 'de';
 const years = [2020,2021,2022,2023,2024,2025];
-const map = L.map('map', {minZoom:6,maxZoom:20}).setView([51.95,11.65],8);
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-  minZoom:0,maxZoom:19,attribution:'Tiles &copy; Esri — Sources: Esri, HERE, Garmin, USGS, OpenStreetMap contributors'
-}).addTo(map);
+const map = L.map('map', {
+  minZoom: 0,
+  maxZoom: 24,
+  zoomSnap: 0.25,
+  zoomDelta: 0.5
+}).setView([51.95, 11.65], 8);
+
+// Basemap tiles use a dedicated low-z-index pane so imagery always stays
+// beneath thematic overlays, even when the user switches basemaps.
+map.createPane('basemapPane');
+map.getPane('basemapPane').style.zIndex = 200;
+
+// Bing Maps requires a valid Bing Maps API key. Set it here (or expose it
+// through your deployment config) before publishing the portal.
+const BING_MAPS_KEY = 'YOUR_BING_MAPS_KEY';
+function bingQuadKey(x, y, z) {
+  let key = '';
+  for (let i = z; i > 0; i--) {
+    let digit = 0;
+    const mask = 1 << (i - 1);
+    if ((x & mask) !== 0) digit += 1;
+    if ((y & mask) !== 0) digit += 2;
+    key += digit;
+  }
+  return key;
+}
+function bingTileLayer(type, attribution) {
+  return L.tileLayer('', {
+    minZoom: 0, maxNativeZoom: 19, maxZoom: 24, pane: 'basemapPane',
+    attribution,
+    // Leaflet's custom URL function receives the standard XYZ tile coordinates.
+    tileUrl: (coords) => {
+      const q = bingQuadKey(coords.x, coords.y, coords.z);
+      const sub = (coords.x + coords.y) % 4;
+      const ext = type === 'r' ? 'png' : 'jpeg';
+      return `https://ecn.t${sub}.tiles.virtualearth.net/tiles/${type}${q}.${ext}?g=1&key=${BING_MAPS_KEY}`;
+    }
+  });
+}
+function createBingLayer(tileType, extension, attribution) {
+  const layer = L.tileLayer('', {
+    minZoom: 0, maxNativeZoom: 19, maxZoom: 24, pane: 'basemapPane', attribution
+  });
+  layer.getTileUrl = function(coords) {
+    const quadkey = bingQuadKey(coords.x, coords.y, coords.z);
+    const subdomain = (coords.x + coords.y) % 4;
+    return `https://ecn.t${subdomain}.tiles.virtualearth.net/tiles/${tileType}${quadkey}.${extension}?g=1&key=${BING_MAPS_KEY}`;
+  };
+  return layer;
+}
+const streetMap = createBingLayer('r', 'png', 'Map tiles &copy; Microsoft Bing');
+const satelliteMap = createBingLayer('a', 'jpeg', 'Imagery &copy; Microsoft Bing');
+streetMap.addTo(map);
+L.control.layers(
+  {'Bing Straßenkarte': streetMap, 'Bing Satellitenbild': satelliteMap},
+  null,
+  {position: 'topright', collapsed: true}
+).addTo(map);
 
 // Layer paths follow the same z/x/y.png convention as the QGIS XYZ export.
 // Missing product folders are harmless until those datasets are added.
 const LAYERS = {};
 const layerGroups = [
-  {level:'pixel', product:'lulc', key:'lulc', titleKey:'lulc', path:'LULC_class_SachsenAnhalt', kind:'categorical'},
-  {level:'pixel', product:'forest', key:'forest', titleKey:'forestState', path:'Forest_State', kind:'forest', years:Array.from({length:9},(_,i)=>2017+i)},
-  {level:'pixel', product:'biomass', key:'biomass', titleKey:'biomass', path:'AGB_density_SachsenAnhalt', kind:'continuous'},
-  {level:'pixel', product:'ndvi', key:'ndvi', titleKey:'ndvi', path:'NDVI_median_SachsenAnhalt', kind:'continuous'},
+  {level:'pixel', product:'lulc', key:'lulc', titleKey:'lulc', path:'LULC_class_SachsenAnhalt', kind:'categorical', years},
+  {level:'pixel', product:'forest', key:'forest', titleKey:'forestState', path:'Forest_State', kind:'forest', years},
+  {level:'pixel', product:'ndvi', key:'ndvi', titleKey:'ndvi', path:'NDVI', kind:'continuous', years},
+  {level:'municipal', product:'ndvi', key:'ndvi', titleKey:'ndvi', kind:'vector', years},
   {level:'municipal', product:'lulc', key:'lulc', titleKey:'lulc', kind:'vector'},
   {level:'municipal', product:'forest', key:'forest', titleKey:'forestState', kind:'vector', years:Array.from({length:9},(_,i)=>2017+i)},
   {level:'municipal', product:'crop', key:'crop', titleKey:'cropDiversity', kind:'vector'}
@@ -77,29 +131,36 @@ let municipalityGeoJSON = null;
 let municipalityDataReady = false;
 let municipalityOutlineLayer = null;
 const municipalityStats = {lclu:new Map(), forest:new Map(), thematic:new Map(), crop:new Map()};
-let selectedMunicipalityId = null;
+let selectedMunicipalityId = null; // legacy ID convention for LULC/Forest (fid - 1)
+let selectedMunicipalityNdviId = null; // NDVI JSON uses GeoJSON fid directly
 const legendNodes = new Map();
 
 function layerId(level, product, year) { return `${level}-${product}-${year ?? 'all'}`; }
 function layerUrl(config, year) {
-  if (config.static) return `data/tiles/${config.path}/{z}/{x}/{y}.png`;
-  return `data/tiles/${config.path}_${year}/{z}/{x}/{y}.png`;
+  if (config.static) {
+    if (config.product === 'permanent') return 'data/pmtiles/Permanent_Grassland.pmtiles';
+    if (config.product === 'conversion') return 'data/pmtiles/Grassland_Conversion.pmtiles';
+  }
+  if (config.product === 'lulc') return `data/pmtiles/LULC_class/LULC_class_SachsenAnhalt_${year}.pmtiles`;
+  if (config.product === 'forest') return `data/pmtiles/Forest_State/Forest_State_${year}.pmtiles`;
+  if (config.product === 'ndvi') return `data/pmtiles/NDVI/NDVI_${year}.pmtiles`;
+  throw new Error(`No PMTiles path configured for ${config.product}`);
 }
 function productName(product) { return I18N[language].products[product]; }
 function layerDisplayName(config, year) { return year == null ? productName(config.product) : `${productName(config.product)} · ${year}`; }
 
 function updateClassMultiSelectLabel() {
-  const root = document.getElementById('analysisClassMultiSelect');
+  const root = document.getElementById('analysisClassDropdown');
   const select = document.getElementById('analysisClasses');
   const button = document.getElementById('analysisClassToggle');
   if (!root || !select || !button) return;
   const selected = [...select.selectedOptions].map(option => option.textContent);
-  button.textContent = selected.length ? `${selected.length} ${language === 'de' ? 'Klassen ausgewählt' : 'classes selected'} ▾` : (language === 'de' ? 'Klassen auswählen ▾' : 'Select classes ▾');
+  button.textContent = `${selected.length} / ${select.options.length} ${language === 'de' ? 'Klassen ausgewählt' : 'classes selected'} ▾`;
 }
 
 function buildLayerControls() {
   const analysisClassSelect = document.getElementById('analysisClasses');
-  const multiSelect = document.getElementById('analysisClassMultiSelect');
+  const multiSelect = document.getElementById('analysisClassDropdown');
   if (analysisClassSelect && multiSelect) {
     analysisClassSelect.replaceChildren();
     const menu = multiSelect.querySelector('.multi-select-menu');
@@ -112,7 +173,7 @@ function buildLayerControls() {
       const label = document.createElement('label');
       label.className = 'multi-select-option';
       const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox'; checkbox.value = id; checkbox.checked = id === '15';
+      checkbox.type = 'checkbox'; checkbox.value = id; checkbox.checked = Number(id) >= 2 && Number(id) <= 14;
       checkbox.addEventListener('change', () => {
         option.selected = checkbox.checked;
         updateClassMultiSelectLabel();
@@ -120,7 +181,7 @@ function buildLayerControls() {
       });
       const text = document.createElement('span'); text.textContent = option.textContent;
       label.append(checkbox, text); menu.appendChild(label);
-      option.selected = id === '15';
+      option.selected = Number(id) >= 2 && Number(id) <= 14;
     });
     updateClassMultiSelectLabel();
   }
@@ -153,12 +214,13 @@ function buildLayerControls() {
       label.className = 'layer-check';
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
+      checkbox.checked = config.level === 'pixel' && config.product === 'lulc' && Number(year) === 2025;
       const text = document.createElement('span');
       text.textContent = year;
       label.append(checkbox, text);
 
       let classSelect = null;
-      if (config.level === 'municipal' && ['lulc','forest'].includes(config.product)) {
+      if (config.level === 'municipal' && ['lulc','forest','ndvi'].includes(config.product)) {
         classSelect = document.createElement('select');
         classSelect.className = 'municipal-class-select';
         classSelect.setAttribute('aria-label', `${config.product} class ${year}`);
@@ -167,8 +229,8 @@ function buildLayerControls() {
         placeholder.textContent = language === 'de' ? 'Klasse wählen ↓' : 'Select class ↓';
         placeholder.selected = true;
         classSelect.appendChild(placeholder);
-        const options = config.product === 'lulc'
-          ? Object.entries(CLASS_NAMES).map(([id,name]) => ({id:Number(id),name}))
+        const options = (config.product === 'lulc' || config.product === 'ndvi')
+          ? Object.entries(CLASS_NAMES).map(([id,name]) => ({id:Number(id),name: I18N[language].classNames[name] || name}))
           : FOREST_CLASSES.map(item => ({id:item.id,name:language === 'de' ? item.de : item.name}));
         options.forEach(item => {
           const option = document.createElement('option');
@@ -214,9 +276,25 @@ function buildLayerControls() {
         LAYERS[id] = {...layerConfig, year, checkbox};
         toggleLayer(layerConfig, year, checkbox.checked);
       });
-      if (classSelect) classSelect.addEventListener('change', updateLayer);
-      row.append(label);
+      if (classSelect) classSelect.addEventListener('change', () => {
+        // Keep municipal NDVI focused on one selected land-use class at a time.
+        if (config.product === 'ndvi' && classSelect.value !== '') {
+          const chosenClass = Number(classSelect.value);
+          [...activeLayers.keys()].forEach(activeId => {
+            const activeConfig = LAYERS[activeId];
+            if (activeConfig?.level === 'municipal' && activeConfig.product === 'ndvi' &&
+                Number(activeConfig.classId) !== chosenClass) {
+              const control = activeConfig.checkbox;
+              if (control) control.checked = false;
+              toggleLayer(activeConfig, activeConfig.year, false);
+            }
+          });
+        }
+        updateLayer();
+      });
+      // Put class selector before year checkbox/label.
       if (classSelect) row.append(classSelect);
+      row.append(label);
       target.appendChild(row);
       updateLayer();
     });
@@ -285,7 +363,24 @@ function makeLegend(config, year) {
   head.append(title, button);
   const content = document.createElement('div');
   content.className = 'legend-content';
-  if (config.product === 'lulc' && config.level === 'pixel') {
+  if (config.product === 'lulc' && config.level === 'municipal') {
+    const labels = ['≤ 1 %', '1–5 %', '5–10 %', '10–20 %', '20–40 %', '> 40 %'];
+    const colors = ['#f7fbff','#c6dbef','#6baed6','#2171b5','#08306b','#041f4a'];
+    const items = document.createElement('div');
+    items.className = 'legend-items';
+    labels.forEach((label, i) => {
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      const swatch = document.createElement('span');
+      swatch.className = 'swatch';
+      swatch.style.backgroundColor = colors[i];
+      const text = document.createElement('span');
+      text.textContent = label;
+      item.append(swatch, text);
+      items.appendChild(item);
+    });
+    content.appendChild(items);
+  } else if (config.product === 'lulc' && config.level === 'pixel') {
     const items = document.createElement('div');
     items.className = 'legend-items';
     Object.entries(CLASS_NAMES).forEach(([id, name]) => {
@@ -315,6 +410,19 @@ function makeLegend(config, year) {
       items.appendChild(item);
     });
     content.appendChild(items);
+  } else if (config.product === 'forest' && config.level === 'municipal') {
+    const caption = document.createElement('div');
+    caption.className = 'ndvi-legend-caption';
+    caption.textContent = language === 'de' ? 'Weiß → Rot · niedriger → höherer Waldschaden' : 'White → red · lower → higher forest damage';
+    const gradient = document.createElement('div');
+    gradient.className = 'legend-gradient forest-gradient';
+    const scale = document.createElement('div');
+    scale.className = 'legend-scale';
+    ['0','1'].forEach((labelText, i) => {
+      const label = document.createElement('span'); label.textContent = i === 0 ? (language === 'de' ? 'Gering' : 'Low') : (language === 'de' ? 'Hoch' : 'High');
+      scale.appendChild(label);
+    });
+    content.append(caption, gradient, scale);
   } else if (config.level === 'pixel' && (config.product === 'permanent' || config.product === 'conversion')) {
     const item = document.createElement('div'); item.className = 'legend-item';
     const swatch = document.createElement('span'); swatch.className = 'swatch'; swatch.style.backgroundColor = config.legendColor;
@@ -344,24 +452,40 @@ function makeLegend(config, year) {
       item.append(swatch,text); items.appendChild(item);
     });
     content.appendChild(items);
-  } else if (config.product === 'biomass' || config.product === 'ndvi') {
-    const gradient = document.createElement('div'); gradient.className = 'legend-gradient';
-    const scale = document.createElement('div'); scale.className = 'legend-scale';
-    const left = document.createElement('span'); left.textContent = config.product === 'ndvi' ? '-1' : 'Low';
-    const right = document.createElement('span'); right.textContent = config.product === 'ndvi' ? '1' : 'High';
-    if (language === 'de' && config.product === 'biomass') { left.textContent='Niedrig'; right.textContent='Hoch'; }
-    scale.append(left,right); content.append(gradient,scale);
-  } else if (config.level === 'municipal' && ['lulc','forest'].includes(config.product)) {
-    const note = document.createElement('div');
-    const className = config.product === 'lulc'
-      ? (language === 'de' ? (I18N.de.classNames[CLASS_NAMES[config.classId]] || CLASS_NAMES[config.classId]) : CLASS_NAMES[config.classId])
-      : (FOREST_CLASSES.find(item => item.id === Number(config.classId))?.[language === 'de' ? 'de' : 'name'] || '');
-    note.textContent = `${className} · ${language==='de'?'Anteil an der Gemeindefläche':'Share of municipality area'}`;
-    content.append(note);
-    const gradient = document.createElement('div'); gradient.className='legend-gradient municipal-spectrum';
-    const scale = document.createElement('div'); scale.className='legend-scale';
-    scale.innerHTML='<span>0%</span><span>1%</span><span>5%</span><span>10%</span><span>20%</span><span>40%+</span>';
-    content.append(gradient,scale);
+  } else if (config.product === 'ndvi') {
+    const gradient = document.createElement('div');
+    gradient.className = 'legend-gradient ndvi-gradient';
+
+    const scale = document.createElement('div');
+    scale.className = 'legend-scale';
+    const left = document.createElement('span');
+    left.textContent = '−0.2';
+    const middle = document.createElement('span');
+    middle.textContent = '0.4';
+    const right = document.createElement('span');
+    right.textContent = '1.0';
+    scale.append(left, middle, right);
+
+    const caption = document.createElement('div');
+    caption.className = 'ndvi-legend-caption';
+    caption.textContent = language === 'de' ? 'Niedriger NDVI → höherer NDVI' : 'Lower NDVI → higher NDVI';
+    content.append(caption, gradient, scale);
+
+  } else if (config.product === 'biomass') {
+  const gradient = document.createElement('div');
+  gradient.className = 'legend-gradient';
+
+  const scale = document.createElement('div');
+  scale.className = 'legend-scale';
+
+  const left = document.createElement('span');
+  left.textContent = 'Low';
+
+  const right = document.createElement('span');
+  right.textContent = 'High';
+
+  scale.append(left, right);
+  content.append(gradient, scale);
   } else {
     const note = document.createElement('div'); note.textContent = language==='de'?'Gemeindestatistik / Choropleth':'Municipality statistics / choropleth'; content.appendChild(note);
   }
@@ -398,9 +522,44 @@ function numericColor(value, breaks, colors) {
   for (let i = 0; i < breaks.length; i++) if (n <= breaks[i]) return colors[i];
   return colors[colors.length - 1];
 }
+
+function getMunicipalityStatId(properties = {}) {
+  if (properties.municipality_id != null && properties.municipality_id !== '') {
+    return String(properties.municipality_id).trim();
+  }
+
+  if (properties.fid != null && Number.isFinite(Number(properties.fid))) {
+    return String(Number(properties.fid) - 1);
+  }
+
+  return '';
+}
+
+// NDVI export uses the original GeoJSON fid (not fid - 1).
+function getNdviMunicipalityStatId(properties = {}) {
+  if (properties.ndvi_municipality_id != null && properties.ndvi_municipality_id !== '') {
+    return String(properties.ndvi_municipality_id).trim();
+  }
+  if (properties.fid != null && properties.fid !== '') {
+    return String(properties.fid).trim();
+  }
+  return '';
+}
+
+function ndviColor(value) {
+  if (value == null || !Number.isFinite(Number(value))) return '#d9dedb';
+  const v = Number(value);
+  const breaks = [-0.2, 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+  const colors = ['#000000','#a50026','#d73027','#f46d43','#fdae61','#fee08b',
+                 '#ffffbf','#d9ef8b','#a6d96a','#66bd63','#1a9850','#006837'];
+  for (let i = 0; i < breaks.length; i++) if (v <= breaks[i]) return colors[i];
+  return colors[colors.length - 1];
+}
+
 function municipalityStyle(feature, config, year) {
   const p = feature.properties || {};
-  const id = String(p.municipality_id ?? (Number.isFinite(Number(p.fid)) ? Number(p.fid) - 1 : ''));
+  const id = getMunicipalityStatId(p);
+
   let fill = '#d9dedb';
 
   if (config.product === 'lulc') {
@@ -410,7 +569,7 @@ function municipalityStyle(feature, config, year) {
   } else if (config.product === 'forest') {
     const rows = municipalityStats.forest.get(statKey(id, year)) || [];
     const row = rows.find(item => Number(item.class_id) === Number(config.classId));
-    if (row) fill = numericColor(row.area_pct, [1,5,10,20,40], ['#f7fbff','#c6dbef','#6baed6','#2171b5','#08306b','#041f4a']);
+    if (row) fill = numericColor(row.area_pct, [1,5,10,20,40], ['#ffffff','#fee5d9','#fcae91','#fb6a4a','#de2d26','#cb181d']);
   } else if (config.product === 'permanent') {
     const row = municipalityStats.thematic.get(id);
     fill = numericColor(row?.permanent_grassland_pct, [5,10,20], ['#f1f8e9','#aed581','#66bb6a','#2e7d32']);
@@ -420,6 +579,14 @@ function municipalityStyle(feature, config, year) {
   } else if (config.product === 'crop') {
     const row = municipalityStats.crop.get(statKey(id, year));
     fill = numericColor(row?.crop_diversity_n, [3,6,9], ['#f1f5f9','#bfdbfe','#60a5fa','#1d4ed8']);
+  } else if (config.product === 'ndvi') {
+    const ndviId = getNdviMunicipalityStatId(p);
+    const row = (municipalityStats.ndviRows || []).find(item =>
+      String(item.municipality_id) === ndviId &&
+      Number(item.year) === Number(year) &&
+      Number(item.class_id) === Number(config.classId)
+    );
+    fill = ndviColor(row?.mean_ndvi);
   }
 
   const opacity = Number(document.getElementById('opacity').value) / 100;
@@ -455,7 +622,7 @@ function updateSelectedProductStats() {
     return;
   }
   const selected = [...activeLayers.keys()].map(id => LAYERS[id]).filter(Boolean);
-  const relevant = selected.filter(config => ['lulc','forest','biomass','ndvi','crop'].includes(config.product));
+  const relevant = selected.filter(config => ['lulc','forest','ndvi','crop'].includes(config.product));
   if (!relevant.length) {
     host.textContent = I18N[language].statisticsUnavailable;
     return;
@@ -503,33 +670,88 @@ function updateSelectedProductStats() {
     } else {
       let value = null;
       const unit = config.product === 'lulc' || config.product === 'forest' ? 'ha' : (config.product === 'biomass' ? 't/ha' : '');
-      if (config.product === 'lulc' || config.product === 'forest') {
-        const index = config.product === 'lulc' ? municipalityStats.lclu : municipalityStats.forest;
-        const rows = index.get(statKey(selectedMunicipalityId, year)) || [];
-        const row = rows.find(r => Number(r.class_id) === Number(config.classId));
-        value = row?.area_ha;
-      } else {
-        const index = config.product === 'biomass' ? municipalityStats.biomass : municipalityStats.ndvi;
-        const row = index?.get(statKey(selectedMunicipalityId, year));
-        value = getMetricValue(row, config.product);
-        if (config.product === 'ndvi' && config.classId != null) {
-          const classRow = (municipalityStats.ndviRows || []).find(r =>
-            String(r.municipality_id) === selectedMunicipalityId &&
-            Number(r.year) === Number(year) && Number(r.class_id) === Number(config.classId));
-          value = getMetricValue(classRow, 'ndvi');
+if (config.product === 'lulc' || config.product === 'forest') {
+  const index = config.product === 'lulc'
+    ? municipalityStats.lclu
+    : municipalityStats.forest;
+
+  const rows = index.get(statKey(selectedMunicipalityId, year)) || [];
+
+const selectedClassIds = config.classId != null
+  ? [Number(config.classId)]
+  : []; 
+
+  const classRows = rows.filter(row =>
+    selectedClassIds.includes(Number(row.class_id))
+  );
+
+  if (classRows.length) {
+    const list = document.createElement('ul');
+    list.className = 'crop-area-list';
+
+    classRows.forEach(row => {
+      const item = document.createElement('li');
+
+      const name = document.createElement('span');
+      name.textContent = classLabel(config.product, row.class_id);
+
+      const area = document.createElement('strong');
+      area.textContent = `${formatNumber(row.area_ha)} ha`;
+
+      item.append(name, area);
+      list.appendChild(item);
+    });
+
+    card.appendChild(list);
+  } else {
+    const strong = document.createElement('strong');
+    strong.textContent = I18N[language].statisticsUnavailable;
+    card.appendChild(strong);
+  }
+
+  value = null;
+} else if (config.product === 'ndvi') {
+        const selectedClassIds = [...document.getElementById('analysisClasses').selectedOptions]
+          .map(option => Number(option.value));
+        const classRows = (municipalityStats.ndviRows || []).filter(row =>
+          String(row.municipality_id) === selectedMunicipalityNdviId &&
+          Number(row.year) === Number(year) &&
+          selectedClassIds.includes(Number(row.class_id))
+        );
+        if (!classRows.length) {
+          const strong = document.createElement('strong');
+          strong.textContent = I18N[language].statisticsUnavailable;
+          card.appendChild(strong);
+        } else {
+          const list = document.createElement('ul');
+          list.className = 'crop-area-list';
+          classRows.sort((a,b) => Number(a.class_id)-Number(b.class_id)).forEach(row => {
+            const item = document.createElement('li');
+            const cropName = document.createElement('span');
+            cropName.textContent = classLabel('lulc', row.class_id);
+            const value = document.createElement('strong');
+            value.textContent = formatNumber(row.mean_ndvi, 3);
+            item.append(cropName, value);
+            list.appendChild(item);
+          });
+          card.appendChild(list);
         }
+      } else {
+        const row = municipalityStats.biomass?.get(statKey(selectedMunicipalityId, year));
+        value = getMetricValue(row, config.product);
+        const strong = document.createElement('strong');
+        strong.textContent = value == null ? I18N[language].statisticsUnavailable : `${formatNumber(value, 1)}${unit ? ` ${unit}` : ''}`;
+        card.appendChild(strong);
       }
-      const strong = document.createElement('strong');
-      strong.textContent = value == null ? I18N[language].statisticsUnavailable : `${formatNumber(value, config.product === 'ndvi' ? 3 : 1)}${unit ? ` ${unit}` : ''}`;
-      card.appendChild(strong);
     }
     host.appendChild(card);
   });
 }
 function showMunicipalityStats(feature) {
   const p = feature.properties || {};
-  const id = String(p.municipality_id ?? (Number.isFinite(Number(p.fid)) ? Number(p.fid) - 1 : ''));
+  const id = getMunicipalityStatId(p);
   selectedMunicipalityId = id;
+  selectedMunicipalityNdviId = getNdviMunicipalityStatId(p);
   document.getElementById('regionName').textContent = getMunicipalityName(p);
   const fmt = value => value == null || value === '' ? I18N[language].statisticsUnavailable : `${formatNumber(value)} ha`;
   const fmtPct = (value, pct) => value == null || value === '' ? I18N[language].statisticsUnavailable : `${fmt(value)}${pct == null || pct === '' ? '' : ` (${formatNumber(pct,2)}%)`}`;
@@ -540,6 +762,109 @@ function showMunicipalityStats(feature) {
   updateAnalytics();
 }
 
+function renderAnalysisRegionOptions() {
+  const host = document.getElementById('analysisRegionSelect');
+  if (!host || !municipalityGeoJSON?.features) return;
+  const features = municipalityGeoJSON.features;
+  const existing = new Set([...host.querySelectorAll('input:checked')].map(input => input.value));
+  host.innerHTML = '';
+  const all = document.createElement('label');
+  all.className = 'analysis-region-option';
+  const allBox = document.createElement('input');
+  allBox.type = 'checkbox'; allBox.dataset.selectAll = 'true';
+  allBox.checked = !existing.size || (existing.size === features.length && features.length > 0);
+  all.append(allBox, document.createTextNode(language === 'de' ? 'Alle Gemeinden' : 'All municipalities'));
+  host.appendChild(all);
+  features.forEach(feature => {
+    const p = feature.properties || {};
+    const id = String(getMunicipalityStatId(p));
+    const label = document.createElement('label');
+    label.className = 'analysis-region-option';
+    const box = document.createElement('input');
+    box.type = 'checkbox'; box.value = id;
+    box.checked = existing.size ? existing.has(id) : true;
+    label.append(box, document.createTextNode(getMunicipalityName(p)));
+    host.appendChild(label);
+  });
+  allBox.addEventListener('change', () => {
+    host.querySelectorAll('input:not([data-select-all])').forEach(box => box.checked = allBox.checked);
+    updateAnalysisRegionSummary(); updateAnalytics();
+  });
+  host.querySelectorAll('input:not([data-select-all])').forEach(box => box.addEventListener('change', () => {
+    allBox.checked = [...host.querySelectorAll('input:not([data-select-all])')].every(item => item.checked);
+    updateAnalysisRegionSummary(); updateAnalytics();
+  }));
+}
+function selectedAnalysisRegionIds() {
+  const host = document.getElementById('analysisRegionSelect');
+  if (!host) return null;
+  return new Set([...host.querySelectorAll('input:not([data-select-all]):checked')].map(input => input.value));
+}
+function exportAnalyticsCsv() {
+  const scope = document.getElementById('analysisScope')?.value || 'region';
+  const product = document.getElementById('analysisProduct')?.value || 'lulc';
+  const classIds = [...document.getElementById('analysisClasses').selectedOptions].map(o => Number(o.value));
+  let rows = product === 'lulc' ? [...municipalityStats.lclu.values()].flat()
+    : product === 'ndvi' ? (municipalityStats.ndviRows || [])
+    : [...(municipalityStats.biomass?.values() || [])];
+  if (scope === 'municipality' && selectedMunicipalityId) {
+    const id = String(product === 'ndvi' ? selectedMunicipalityNdviId : selectedMunicipalityId);
+    rows = rows.filter(r => String(r.municipality_id) === id);
+  } else if (scope === 'region') {
+    const ids = selectedAnalysisRegionIds();
+    if (ids && ids.size) rows = rows.filter(r => ids.has(String(r.municipality_id)));
+    else rows = [];
+  }
+  if ((product === 'lulc' || product === 'ndvi') && classIds.length) rows = rows.filter(r => classIds.includes(Number(r.class_id)));
+  const columns = [...new Set(rows.flatMap(r => Object.keys(r)))];
+  const csvCell = value => '"' + String(value ?? '').replace(/"/g, '""') + '"';
+  const csv = [columns.map(csvCell).join(','), ...rows.map(r => columns.map(c => csvCell(r[c])).join(','))].join('\r\n');
+  const blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=`resedium_${product}_${scope}.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function renderAnalysisYears() {
+  const host = document.getElementById('analysisYearSelect');
+  if (!host) return;
+  const yearValues = [...new Set(years.map(Number))].sort((a,b)=>a-b);
+  host.innerHTML = '';
+  yearValues.forEach(year => {
+    const label=document.createElement('label'); label.className='analysis-region-option';
+    const input=document.createElement('input'); input.type='checkbox'; input.value=String(year); input.checked=true;
+    label.append(input, document.createTextNode(String(year))); host.appendChild(label);
+    input.addEventListener('change', () => { updateAnalysisYearSummary(); updateAnalytics(); });
+  });
+}
+function selectedAnalysisYears() {
+  const host=document.getElementById('analysisYearSelect');
+  return host ? [...host.querySelectorAll('input:checked')].map(i=>Number(i.value)) : years;
+}
+function setupAnalysisSelectAll(hostId, buttonId) {
+  const host=document.getElementById(hostId), button=document.getElementById(buttonId);
+  if (!host || !button) return;
+  button.addEventListener('click', () => {
+    const boxes=[...host.querySelectorAll('input:not([data-select-all])')];
+    const shouldSelect=boxes.some(b=>!b.checked);
+    boxes.forEach(b=>b.checked=shouldSelect);
+    if(hostId==='analysisRegionSelect') updateAnalysisRegionSummary();
+    if(hostId==='analysisYearSelect') updateAnalysisYearSummary();
+    updateAnalytics();
+  });
+}
+function updateAnalysisRegionSummary() {
+ const checked=document.querySelectorAll('#analysisRegionSelect input:not([data-select-all]):checked').length;
+ const total=document.querySelectorAll('#analysisRegionSelect input:not([data-select-all])').length;
+ const el=document.getElementById('analysisRegionSummary');
+ if(el) el.textContent=`${checked} / ${total} municipalities ▾`;
+}
+function updateAnalysisYearSummary() {
+ const checked=document.querySelectorAll('#analysisYearSelect input:checked').length;
+ const total=document.querySelectorAll('#analysisYearSelect input').length;
+ const el=document.getElementById('analysisYearSummary');
+ if(el) el.textContent=`${checked} / ${total} years ▾`;
+}
 function updateAnalytics() {
   const scope = document.getElementById('analysisScope')?.value || 'region';
   const product = document.getElementById('analysisProduct')?.value || 'lulc';
@@ -549,12 +874,15 @@ function updateAnalytics() {
   if (!chart || !classSelect) return;
   const usesClasses = product === 'lulc' || product === 'ndvi';
   classSelect.disabled = !usesClasses;
-  const multiRoot = document.getElementById('analysisClassMultiSelect');
+  const multiRoot = document.getElementById('analysisClassDropdown');
   const multiButton = document.getElementById('analysisClassToggle');
   if (multiRoot) multiRoot.hidden = !usesClasses;
   if (multiButton) multiButton.disabled = !usesClasses;
   if (!usesClasses) classSelect.value = '';
   const selectedClasses = usesClasses ? [...classSelect.selectedOptions].map(o => Number(o.value)) : [];
+  const selectedYears = selectedAnalysisYears();
+  const yearsToShow = selectedYears;
+  if (!yearsToShow.length) { chart.innerHTML=''; note.textContent='Select at least one year.'; return; }
   if (usesClasses && !selectedClasses.length) {
     chart.innerHTML = '';
     note.textContent = language === 'de' ? 'Bitte mindestens eine Klasse auswählen.' : 'Select at least one class.';
@@ -565,7 +893,6 @@ function updateAnalytics() {
     note.textContent = language === 'de' ? 'Bitte zuerst eine Gemeinde auf der Karte anklicken.' : 'Click a municipality on the map first.';
     return;
   }
-  const yearsToShow = years;
   const rowsFor = (year) => {
     if (product === 'lulc') return [...municipalityStats.lclu.values()].flat().filter(r => Number(r.year) === year);
     if (product === 'biomass') return [...(municipalityStats.biomass?.values() || [])].filter(r => Number(r.year) === year);
@@ -573,9 +900,10 @@ function updateAnalytics() {
     return [];
   };
   const allRows = yearsToShow.flatMap(rowsFor);
+  const regionSelection = selectedAnalysisRegionIds();
   const ids = scope === 'municipality'
-    ? new Set([selectedMunicipalityId])
-    : new Set(allRows.map(r => String(r.municipality_id)));
+    ? new Set([product === 'ndvi' ? selectedMunicipalityNdviId : selectedMunicipalityId])
+    : (regionSelection || new Set());
   if (!ids.size || !allRows.length) {
     chart.innerHTML = '';
     note.textContent = I18N[language].statisticsUnavailable;
@@ -584,14 +912,36 @@ function updateAnalytics() {
   const classes = usesClasses ? selectedClasses : [null];
   const series = classes.map(classId => {
     const values = yearsToShow.map(year => {
-      const matching = rowsFor(year).filter(row =>
+      let matching = rowsFor(year).filter(row =>
         ids.has(String(row.municipality_id)) &&
         (classId == null || Number(row.class_id) === classId));
+      // NDVI region statistics come from the Sachsen-Anhalt polygon itself.
+      // Do not average the region row together with its municipalities (double counting).
+      if (product === 'ndvi' && scope === 'region') {
+        const stateRows = matching.filter(row =>
+          String(row.municipality_name || '').toLowerCase().includes('sachsen-anhalt') ||
+          String(row.municipality_id) === '1'
+        );
+        if (stateRows.length) matching = stateRows;
+      }
       if (!matching.length) return null;
       if (product === 'lulc') return matching.reduce((sum,row) => sum + Number(row.area_ha || 0), 0);
-      const metric = product === 'biomass'
-        ? matching.map(r => getMetricValue(r,'biomass'))
-        : matching.map(r => getMetricValue(r,'ndvi'));
+      if (product === 'ndvi') {
+        // Region-wide NDVI must be pixel-weighted, not an unweighted mean of Gemeinde means.
+        const valid = matching.filter(r =>
+          getMetricValue(r, 'ndvi') != null &&
+          getMetricValue(r, 'ndvi') !== '' &&
+          Number.isFinite(Number(getMetricValue(r, 'ndvi'))) &&
+          Number(r.pixel_count) > 0
+        );
+        if (!valid.length) return null;
+        if (scope === 'municipality') return Number(getMetricValue(valid[0], 'ndvi'));
+        const totalPixels = valid.reduce((sum, r) => sum + Number(r.pixel_count), 0);
+        return valid.reduce((sum, r) =>
+          sum + Number(getMetricValue(r, 'ndvi')) * Number(r.pixel_count), 0
+        ) / totalPixels;
+      }
+      const metric = matching.map(r => getMetricValue(r,'biomass'));
       const valid = metric.map(Number).filter(Number.isFinite);
       return valid.length ? valid.reduce((a,b) => a+b,0)/valid.length : null;
     });
@@ -606,7 +956,7 @@ function updateAnalytics() {
   const min = product === 'ndvi' ? Math.min(...finite) : 0;
   const max = Math.max(...finite, min + (product === 'ndvi' ? 0.001 : 1));
   const width = 680, height = 250, left = 68, right = 18, top = 18, bottom = 38;
-  const x = i => left + i * (width-left-right)/(yearsToShow.length-1);
+  const x = i => yearsToShow.length === 1 ? (left + width-right)/2 : left + i * (width-left-right)/(yearsToShow.length-1);
   const y = v => height-bottom - ((v-min)/(max-min || 1))*(height-top-bottom);
   const colors = ['#26734d','#d97706','#2563eb','#9333ea','#dc2626','#0891b2'];
   const unit = product === 'lulc' ? 'ha' : (product === 'biomass' ? 't/ha' : '');
@@ -683,6 +1033,26 @@ async function loadMunicipalityData() {
   });
   // Outlines are optional and start disabled; thematic municipality layers remain independent.
   municipalityDataReady = true;
+  renderAnalysisRegionOptions();
+  renderAnalysisYears();
+  setupAnalysisSelectAll('analysisRegionSelect','analysisRegionAll');
+  setupAnalysisSelectAll('analysisYearSelect','analysisYearAll');
+  const classAllButton = document.getElementById('analysisClassAll');
+if (classAllButton) classAllButton.addEventListener('click', () => {
+  const boxes = [...document.querySelectorAll('#analysisClassDropdown .multi-select-menu input[type="checkbox"]')];
+  const select = document.getElementById('analysisClasses');
+  const selectAll = boxes.some(box => !box.checked);
+  boxes.forEach(box => {
+    box.checked = selectAll;
+    const option = [...select.options].find(o => o.value === box.value);
+    if (option) option.selected = selectAll;
+  });
+  updateClassMultiSelectLabel();
+  updateAnalytics();
+});
+  
+  updateAnalysisRegionSummary(); updateAnalysisYearSummary();
+  updateAnalytics();
   console.info(`Loaded ${geo.features.length} Gemeinde polygons.`);
 
   // Statistics are independent/optional. One missing file no longer blocks all polygons.
@@ -692,7 +1062,7 @@ async function loadMunicipalityData() {
     fetchJsonFirst(['data/statistics/thematic_statistics.json', 'data/thematic_statistics.json']),
     fetchJsonFirst(['data/statistics/crop_diversity.json', 'data/crop_diversity.json']),
     fetchJsonFirst(['data/statistics/biomass_statistics.json', 'data/biomass_statistics.json']),
-    fetchJsonFirst(['data/statistics/ndvi_statistics.json', 'data/ndvi_statistics.json'])
+    fetchJsonFirst(['data/statistics/NDVI_municipality_class_statistics_2020_2025.json', 'data/statistics/ndvi_statistics.json', 'data/ndvi_statistics.json'])
   ]);
   const group = records => {
     const out = new Map();
@@ -708,8 +1078,72 @@ async function loadMunicipalityData() {
   municipalityStats.thematic = indexRecords(Array.isArray(thematic) ? thematic : [], row => String(row.municipality_id));
   municipalityStats.crop = indexRecords(Array.isArray(crop) ? crop : [], row => statKey(row.municipality_id, row.year));
   municipalityStats.biomass = indexRecords(Array.isArray(biomass) ? biomass : [], row => statKey(row.municipality_id, row.year));
-  municipalityStats.ndviRows = Array.isArray(ndvi) ? ndvi : [];
-  municipalityStats.ndvi = indexRecords(municipalityStats.ndviRows.filter(row => row.class_id == null), row => statKey(row.municipality_id, row.year));
+  // NDVI JSON export structure is municipality -> years -> LULC class:
+  // { "1": { municipality_id:"1", municipality_name:"Sachsen-Anhalt",
+  //         years: { "2020": { "1": {pixel_count, mean_ndvi}, ... } } }
+  // Also accept a flat row array and the older year -> municipality nesting.
+  const flattenNdvi = data => {
+    if (Array.isArray(data)) {
+      return data.map(row => ({
+        ...row,
+        municipality_id: String(row.municipality_id ?? row.municipalityId ?? row.fid ?? ''),
+        year: Number(row.year),
+        class_id: Number(row.class_id ?? row.classId),
+        mean_ndvi: row.mean_ndvi ?? row.ndvi_mean ?? row.mean ?? row.value ?? row.ndvi ?? null,
+        pixel_count: Number(row.pixel_count ?? row.count ?? 0)
+      }));
+    }
+
+    const rows = [];
+    const addClassRows = (municipality_id, municipality_name, year, classes) => {
+      Object.entries(classes || {}).forEach(([class_id, values]) => {
+        const v = values?.statistics ?? values?.data ?? values;
+        rows.push({
+          municipality_id: String(municipality_id),
+          municipality_name: municipality_name ?? '',
+          year: Number(year),
+          class_id: Number(v?.class_id ?? class_id),
+          mean_ndvi: v?.mean_ndvi ?? v?.ndvi_mean ?? v?.mean ?? v?.value ?? v?.ndvi ?? null,
+          pixel_count: Number(v?.pixel_count ?? v?.count ?? 0)
+        });
+      });
+    };
+
+    Object.entries(data || {}).forEach(([topKey, topValue]) => {
+      // New export: top-level municipality, then years.
+      if (topValue && typeof topValue === 'object' && topValue.years && typeof topValue.years === 'object') {
+        const municipalityId = topValue.municipality_id ?? topKey;
+        const municipalityName = topValue.municipality_name ?? topValue.name ?? '';
+        Object.entries(topValue.years).forEach(([year, classes]) => {
+          addClassRows(municipalityId, municipalityName, year, classes);
+        });
+        return;
+      }
+
+      // Legacy export: top-level year, then municipality.
+      if (topValue && typeof topValue === 'object') {
+        Object.entries(topValue).forEach(([municipalityId, municipality]) => {
+          const classes = municipality?.classes ?? municipality?.class_statistics ?? municipality?.statistics;
+          if (classes) {
+            addClassRows(
+              municipality?.municipality_id ?? municipalityId,
+              municipality?.municipality_name ?? municipality?.name ?? '',
+              topKey,
+              classes
+            );
+          }
+        });
+      }
+    });
+    return rows;
+  };
+
+
+  municipalityStats.ndviRows = flattenNdvi(ndvi);
+  municipalityStats.ndvi = indexRecords(
+  municipalityStats.ndviRows,
+  row => statKey(row.municipality_id, row.year)
+);
   updateAnalytics();
   console.info('Municipality statistics loaded:', {
     lulc: municipalityStats.lclu.size,
@@ -733,7 +1167,7 @@ function addMunicipalityLayer(config, year) {
   layer.addTo(map);
   return layer;
 }
-function toggleLayer(config, year, checked) {
+async function toggleLayer(config, year, checked) {
   const id = config.id || layerId(config.level, config.product, year);
   const existing = activeLayers.get(id);
   if (checked) {
@@ -743,12 +1177,27 @@ function toggleLayer(config, year, checked) {
       layer = addMunicipalityLayer(config, year);
       if (!layer) { const control = document.querySelector(`[data-layer-id="${id}"]`); if (control) control.checked = false; return; }
     } else {
-      layer = L.tileLayer(layerUrl(config, year), {
-        minZoom:6, maxNativeZoom:14, maxZoom:20, opacity:Number(document.getElementById('opacity').value)/100,
-        tms:false, keepBuffer:4, updateWhenZooming:false, attribution:'ReSeDiUm'
-      });
-      layer.on('tileerror', event => console.warn(`Tile unavailable for ${id}: ${event.tile?.src || ''}`));
-      layer.addTo(map);
+const archive = new pmtiles.PMTiles(layerUrl(config, year));
+
+// Read the actual zoom range from the PMTiles archive.
+const header = await archive.getHeader();
+
+layer = pmtiles.leafletRasterLayer(archive, {
+  attribution: 'ReSeDiUm',
+
+  // Zoom range supported by the map.
+  minZoom: 0,
+  maxZoom: 24,
+  // Thematic raster layers must render above Bing basemaps.
+  pane: 'overlayPane',
+
+  // Actual native zoom range of this PMTiles file.
+  minNativeZoom: header.minZoom,
+  maxNativeZoom: header.maxZoom
+});
+
+layer.setOpacity(Number(document.getElementById('opacity').value) / 100);
+layer.addTo(map);
     }
     activeLayers.set(id, layer);
     const legendKey = config.level === 'pixel' ? `pixel-${config.product}` : `municipal-${config.product}-${config.classId ?? 'all'}`;
@@ -856,8 +1305,9 @@ function applyLanguage(nextLanguage) {
 
 document.getElementById('language').addEventListener('click', () => applyLanguage(language === 'de' ? 'en' : 'de'));
 ['analysisScope','analysisProduct'].forEach(id => document.getElementById(id)?.addEventListener('change', updateAnalytics));
-document.getElementById('analysisClassToggle')?.addEventListener('click', () => document.getElementById('analysisClassMultiSelect')?.classList.toggle('open'));
-document.addEventListener('click', event => { const root=document.getElementById('analysisClassMultiSelect'); if (root && !root.contains(event.target)) root.classList.remove('open'); });
+document.getElementById('exportAnalysisCsv')?.addEventListener('click', exportAnalyticsCsv);
+document.getElementById('analysisClassToggle')?.addEventListener('click', () => document.getElementById('analysisClassDropdown')?.classList.toggle('open'));
+document.addEventListener('click', event => { const root=document.getElementById('analysisClassDropdown'); if (root && !root.contains(event.target)) root.classList.remove('open'); });
 document.getElementById('reset').addEventListener('click', () => map.setView([51.95,11.65],8));
 document.getElementById('opacity').addEventListener('input', event => {
   const opacity = Number(event.target.value)/100;
@@ -883,3 +1333,8 @@ loadMunicipalityData().catch(error => {
 
 buildLayerControls();
 applyLanguage('de');
+
+document.getElementById('analysisClasses')?.addEventListener('change', () => {
+  updateSelectedProductStats();
+  updateAnalytics();
+});

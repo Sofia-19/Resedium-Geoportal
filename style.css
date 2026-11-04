@@ -52,3 +52,150 @@ main{display:grid;grid-template-columns:280px minmax(420px,1fr) 260px;grid-templ
 
 /* Crop diversity details in the municipality statistics panel. */
 .crop-area-list{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:5px}.crop-area-list li{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:11px;line-height:1.35;border-top:1px solid #e8eee9;padding-top:5px}.crop-area-list li span{min-width:0}.crop-area-list li strong{white-space:nowrap;font:700 11px Manrope;color:var(--ink)}
+
+/* Continuous NDVI spectral legend (same color ramp as municipality choropleth). */
+.ndvi-gradient{
+  background:linear-gradient(90deg,
+    #000000 0%,
+    #a50026 8.33%,
+    #d73027 16.66%,
+    #f46d43 25%,
+    #fdae61 33.33%,
+    #fee08b 41.66%,
+    #ffffbf 50%,
+    #d9ef8b 58.33%,
+    #a6d96a 66.66%,
+    #66bd63 75%,
+    #1a9850 83.33%,
+    #006837 100%);
+}
+.ndvi-legend-caption{font-size:9px;color:#53645a;margin:3px 0 2px}
+
+/* Municipal forest-damage legend: continuous white-to-red scale */
+.forest-gradient {
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ffffff 0%, #fee5d9 25%, #fcae91 50%, #fb6a4a 75%, #cb181d 100%);
+  border: 1px solid rgba(80, 30, 30, 0.18);
+}
+
+/* Header/funding partner logos */
+.hsa-logo { width: 220px; max-width: 28vw; height: auto; object-fit: contain; flex: 0 0 auto; }
+header .brand small { letter-spacing: .08em; }
+.funding { display:flex; align-items:center; justify-content:space-between; gap:28px; }
+.funding-copy { flex:1; min-width:0; }
+.funding-logos { display:flex; align-items:center; justify-content:flex-end; gap:18px; flex-wrap:wrap; }
+.funding-logos img { max-width:180px; max-height:90px; width:auto; height:auto; object-fit:contain; }
+.funding-logos img:first-child { max-width:150px; max-height:115px; }
+.analysis-region-select { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:5px 12px; max-height:150px; overflow:auto; padding:8px; border:1px solid var(--border,#dce4df); border-radius:8px; }
+.analysis-region-option { display:flex; align-items:center; gap:7px; font-size:.85rem; }
+.analysis-region-option input { width:auto; }
+#exportAnalysisCsv { margin:6px 0 10px; }
+@media (max-width:700px) { .funding { flex-direction:column; align-items:flex-start; } .funding-logos { justify-content:flex-start; } .hsa-logo { width:150px; max-width:35vw; } }
+
+.analysis-dropdown { position:relative; margin:4px 0 10px; }
+.analysis-dropdown summary { cursor:pointer; padding:9px 12px; border:1px solid var(--border,#dce4df); border-radius:8px; background:var(--panel,#fff); font-size:.9rem; }
+.analysis-dropdown[open] summary { border-radius:8px 8px 0 0; }
+.analysis-region-select { max-height:190px; overflow:auto; padding:9px; border:1px solid var(--border,#dce4df); border-top:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:5px 10px; }
+.multi-select-all { margin:6px 0 8px; padding:6px 10px; cursor:pointer; }
+.analysis-chart-header { display:flex; justify-content:flex-end; align-items:center; margin:8px 0; }
+
+/* Unified analytics selectors */
+.analysis-control-label { display:block; font-size:1.08rem; font-weight:700; margin:12px 0 6px; }
+.analysis-select-instruction { font-size:.9rem; color:var(--muted,#667085); margin:8px 0 12px; }
+#analysisClassDropdown .multi-select-menu { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:5px 10px; max-height:190px; overflow:auto; padding:9px; border:1px solid var(--border,#dce4df); border-top:0; }
+#analysisClassDropdown .multi-select-option { display:flex; align-items:center; gap:7px; padding:3px 0; }
+#analysisClassDropdown .multi-select-option input { width:auto; }
+#analysisClassAll, #analysisRegionAll, #analysisYearAll { display:block; width:100%; text-align:left; }
+#analysisClassDropdown summary, #analysisRegionDropdown summary, #analysisYearDropdown summary { font-size:.95rem; font-weight:500; }
+
+/* Analytics controls: headings above each selector, left aligned */
+.analytics .analysis-controls {
+  display: block !important;
+}
+.analytics .analysis-control-label {
+  display: block !important;
+  width: 100%;
+  text-align: left !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  margin: 16px 0 7px !important;
+}
+.analytics .analysis-select-instruction {
+  text-align: left;
+  font-size: 14px;
+  margin: 8px 0 14px;
+}
+.analytics .analysis-dropdown,
+.analytics .analysis-controls > select {
+  display: block;
+  width: 100%;
+  margin: 0 0 12px;
+}
+.analytics .analysis-region-select,
+.analytics #analysisClassDropdown .multi-select-menu {
+  grid-template-columns: 1fr !important;
+}
+.analytics .analysis-region-option,
+.analytics .multi-select-option {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  gap: 7px !important;
+  text-align: left !important;
+  padding: 4px 6px !important;
+}
+.analytics .analysis-region-option input,
+.analytics .multi-select-option input {
+  flex: 0 0 auto;
+  margin: 0 !important;
+}
+.analytics .analysis-region-option span,
+.analytics .multi-select-option span {
+  text-align: left !important;
+}
+.analytics #analysisProduct {
+  width: 100%;
+}
+
+/* Analytics filter panel left, chart panel right */
+.analytics .analysis-layout {
+  display: grid;
+  grid-template-columns: minmax(230px, 300px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  margin-top: 14px;
+}
+.analytics .analysis-filter-panel {
+  min-width: 0;
+  width: 100%;
+}
+.analytics .analysis-plot-panel {
+  min-width: 0;
+  width: 100%;
+  padding-top: 4px;
+}
+.analytics .analysis-filter-panel .analysis-controls {
+  display: block !important;
+}
+.analytics .analysis-filter-panel .analysis-dropdown,
+.analytics .analysis-filter-panel select {
+  width: 100%;
+}
+.analytics .analysis-plot-panel .analysis-chart-header {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 8px;
+}
+.analytics .analysis-chart svg {
+  width: 100%;
+  height: auto;
+  min-height: 240px;
+}
+@media (max-width: 900px) {
+  .analytics .analysis-layout { grid-template-columns: 1fr; }
+  .analytics .analysis-filter-panel { max-width: none; }
+}
+
+.analysis-export-footer { display:flex; justify-content:flex-end; margin:12px 0 0; }

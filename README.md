@@ -1,96 +1,92 @@
-# ReSeDiUm Geoportal — updated layer configuration
+# ReSeDiUm Geoportal
 
-Bilingual (German/English) static Leaflet geoportal for Saxony-Anhalt.
+Bilingual static Leaflet Geoportal for Saxony-Anhalt. Raster overlays are loaded from local PMTiles archives; municipality boundaries and statistics are loaded from GeoJSON/JSON.
 
-## Included in this update
+## Data directory layout
 
-- Existing pixel products: LULC, Forest condition, above-ground biomass and median NDVI.
-- Forest-condition year selector now covers **2017–2025**.
-- Two additional pixel-level thematic layers:
-  - `Permanent_Grassland` — grassland in at least 5 of 6 years (2020–2025), green legend.
-  - `Grassland_Conversion` — strict `GGGCCC`: grassland in 2020–2022 followed by cropland in 2023–2025, red legend.
-- **No separate Cropland map layers are included.** Crop diversity remains a municipality-level statistic only (count crops with at least 50 ha).
-- Multiple layers can be displayed simultaneously; each active layer has a collapsible legend.
-- Municipality click panel can display LULC area, permanent-grassland area and percentage, conversion area and percentage, and crop diversity for 2025 when these properties are present in `data/municipalities.geojson`.
-
-## Expected tile folders
-
-Pixel-level XYZ PNG tiles (`{z}/{x}/{y}.png`):
+Place the `data` folder beside `index.html`, `app.js`, and `style.css`:
 
 ```text
-data/tiles/LULC_class_SachsenAnhalt_2020/ ... _2025/
-data/tiles/Forest_condition_SachsenAnhalt_2017/ ... _2025/
-data/tiles/AGB_density_SachsenAnhalt_2020/ ... _2025/
-data/tiles/NDVI_median_SachsenAnhalt_2020/ ... _2025/
-data/tiles/Permanent_Grassland/
-data/tiles/Grassland_Conversion/
+data/
+├── pmtiles/
+│   ├── Permanent_Grassland.pmtiles
+│   ├── Grassland_Conversion.pmtiles
+│   ├── NDVI/
+│   │   ├── NDVI_2020.pmtiles
+│   │   ├── ...
+│   │   └── NDVI_2026.pmtiles
+│   ├── LULC_class/
+│   │   ├── LULC_class_SachsenAnhalt_2020.pmtiles
+│   │   └── ... _2025.pmtiles
+│   └── Forest_State/
+│       ├── Forest_State_2020.pmtiles
+│       └── ... _2025.pmtiles
+└── statistics/
+    ├── crop_diversity.json
+    ├── forest_statistics.json
+    ├── lclu_statistics.json
+    ├── NDVI_municipality_class_statistics_2020_2025.json
+    ├── thematic_statistics.json
+    └── municipalities.geojson
 ```
 
-The two new thematic tile folder names must match exactly. The app assumes native tile zoom 6–14 and permits visual upscaling to zoom 20. Change `maxNativeZoom` in `app.js` if the tiles were generated to a different maximum zoom.
+PMTiles must be raster PNG archives with XYZ tile coordinates (the standard PMTiles conversion from XYZ PNG/MBTiles). The web app uses PMTiles JS 4.5.0 via CDN and Leaflet 1.9.4.
 
-## Municipality boundaries and statistics
+## Layers and years
 
-Place a web-ready GeoJSON at `data/municipalities.geojson`, in EPSG:4326. Keep one feature per municipality. Recommended properties:
+- LULC pixel layer: 2020–2025
+- Forest condition pixel layer: 2020–2025
+- Median NDVI pixel layer: 2020–2026
+- Permanent grassland: single archive
+- Grassland conversion (strict GGGCCC): single archive
+- Municipality statistics: Gemeinde only; LULC, forest, NDVI by LULC class, crop diversity and thematic indicators.
+- NDVI municipality class statistics: 2020–2025, by municipality and LULC class. Region-level NDVI time series is weighted by valid pixel count.
 
-- `municipality_id`, `AGS`, `RS`, `Name`, `Art`
-- `permanent_grassland_ha`, `permanent_grassland_pct`
-- `conversion_ha`, `conversion_pct`
-- `crop_diversity_2025` (number of crop types with area >= 50 ha)
-- optionally `lulc_area_ha`
+The analytics class selector initially selects agricultural classes 2–14. To focus on a subset, uncheck classes in the dropdown.
 
-The browser cannot directly read GeoPackage or Parquet. Export the geometry once as GeoJSON and join the compact municipality statistics to its properties. Example Colab code (run after `municipalities`, `result`, and `crop_diversity` have been created):
+## Municipality boundaries and JSON statistics
 
-```python
-import os
-import geopandas as gpd
-import pandas as pd
+GeoJSON must be web-ready in EPSG:4326 and contain one feature per Gemeinde. The app reads `data/statistics/municipalities.geojson` and filters features with `properties.Art === "Gemeinde"`.
 
-# Keep the municipality geometry and stable identifiers.
-web = municipalities[[
-    "municipality_id", "AGS", "RS", "Name", "Art", "geometry"
-]].copy()
-web["AGS"] = web["AGS"].astype("string")
+The NDVI class JSON supports this nested structure:
 
-# Add Permanent Grassland and strict conversion statistics.
-web = web.merge(
-    result[[
-        "municipality_id",
-        "permanent_grassland_ha", "permanent_grassland_pct",
-        "conversion_ha", "conversion_pct"
-    ]],
-    on="municipality_id", how="left", validate="one_to_one"
-)
-
-# Add crop diversity for each year; the portal currently displays 2025.
-diversity_wide = crop_diversity.pivot(
-    index="municipality_id", columns="year", values="crop_diversity_n"
-).rename(columns=lambda y: f"crop_diversity_{int(y)}").reset_index()
-web = web.merge(
-    diversity_wide, on="municipality_id", how="left", validate="one_to_one"
-)
-
-# GeoJSON must use WGS84 longitude/latitude.
-web = web.to_crs("EPSG:4326")
-web.to_file(
-    os.path.join(output_dir, "municipalities.geojson"),
-    driver="GeoJSON"
-)
+```json
+{
+  "1": {
+    "municipality_id": "1",
+    "municipality_name": "Sachsen-Anhalt",
+    "years": {
+      "2020": {
+        "2": {
+          "mean_ndvi": 0.65,
+          "pixel_count": 1234
+        }
+      }
+    }
+  }
+}
 ```
 
-If your existing `municipalities` GeoDataFrame already uses a different municipality identifier or the `result` table has a different schema, adapt the join key and columns before export. Do not join by row order.
+The app also accepts a flat NDVI statistics array and the older year → municipality nesting for backwards compatibility. For the municipality → years → classes structure, `municipality_id` must match the GeoJSON feature `fid` (NDVI uses the direct `fid`, not the legacy `fid - 1` mapping used by LULC/Forest).
+
+Other statistic files retain the existing portal schema:
+- `lclu_statistics.json`: municipality_id, year, class_id, area_ha, area_pct
+- `forest_statistics.json`: municipality_id, year, class_id, area_ha, area_pct
+- `crop_diversity.json`: municipality_id, year, crop_diversity_n
+- `thematic_statistics.json`: municipality_id, permanent_grassland_ha, permanent_grassland_pct, conversion_ha, conversion_pct
 
 ## Run locally
 
-From this folder:
+From the portal folder:
 
 ```bash
-python -m http.server 8000
+npx http-server . -p 8000 --cors
 ```
 
-Open `http://localhost:8000`. Do not open `index.html` directly with `file://`.
+The server must support HTTP Range requests for PMTiles. Open `http://localhost:8000`. Do not open `index.html` directly with `file://`; browsers block local JSON and PMTiles fetches in that mode.
 
 ## Notes
 
-- The tile folders and `data/municipalities.geojson` are not bundled in this ZIP. Copy your generated tiles and exported GeoJSON into the indicated folders.
-- Municipality-level choropleth tile folders from the previous version remain optional; this update does not generate them.
-- Esri basemap attribution is retained in the map.
+- Data files are not included in this source ZIP. Copy the `data` folder into the portal root.
+- NDVI statistics use standard NDVI units (mean NDVI = stored raster values divided by 100).
+- Esri basemap attribution is retained.

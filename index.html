@@ -9,10 +9,10 @@
 </head>
 <body>
 <header>
-  <div class="mark">SA</div>
+  <img class="hsa-logo" src="assets/hsa.png" alt="Hochschule Anhalt">
   <div class="brand">
-    <small>RESEDIUM · GEOINFORMATION</small>
-    <h1 id="projectTitle">Satelliten- und Sprachdaten für die Analyse nutzbarer Landflächen</h1>
+    <small>Geoportal</small>
+    <h1 id="projectTitle">RESEDIUM: Satelliten- und Sprachdaten für die Analyse nutzbarer Landflächen</h1>
     <p id="projectSubtitle">Sachsen-Anhalt · 2020–2025</p>
   </div>
   <button id="language" class="lang-button" aria-label="Switch language">EN</button>
@@ -36,23 +36,19 @@
             <div class="year-list" id="pixel-forest"></div>
           </details>
           <details>
-            <summary data-i18n="biomass">Oberirdische Biomasse</summary>
-            <div class="year-list" id="pixel-biomass"></div>
-          </details>
-          <details>
             <summary data-i18n="ndvi">Median-NDVI</summary>
             <div class="year-list" id="pixel-ndvi"></div>
           </details>
-          <details open>
+          <details>
             <summary data-i18n="thematicIndicators">Thematische Indikatoren</summary>
             <div class="year-list" id="pixel-thematic"></div>
           </details>
         </div>
       </details>
-      <details class="tree-group">
+      <details open class="tree-group">
         <summary data-i18n="municipalityLevel">Municipality level</summary>
         <div class="tree-subgroup">
-          <details open>
+          <details>
             <summary data-i18n="lulc">Landbedeckung (LULC)</summary>
             <div class="year-list" id="municipal-lulc"></div>
           </details>
@@ -61,10 +57,14 @@
             <div class="year-list" id="municipal-forest"></div>
           </details>
           <details>
+            <summary data-i18n="ndvi">Median-NDVI</summary>
+            <div class="year-list" id="municipal-ndvi"></div>
+          </details>
+          <details>
             <summary data-i18n="cropDiversity">Kulturartenvielfalt (Kulturen ≥ 50 ha)</summary>
             <div class="year-list one-column" id="municipal-crop"></div>
           </details>
-          <details open>
+          <details>
             <summary data-i18n="thematicIndicators">Thematische Indikatoren</summary>
             <div class="year-list one-column" id="municipal-thematic"></div>
           </details>
@@ -80,7 +80,7 @@
 
   <section class="map-panel">
     <div class="map-head">
-      <div><small data-i18n="interactiveMap">INTERAKTIVE KARTE</small><h2 id="mapTitle">ReSeDiUm · Karte</h2></div>
+      <div><small data-i18n="interactiveMap">INTERAKTIVE KARTE</small><h2 id="mapTitle">Geoportal</h2></div>
       <button id="reset" data-i18n="resetView">Ansicht zurücksetzen</button>
     </div>
     <div id="map"></div>
@@ -98,28 +98,53 @@
   <aside class="analytics">
     <small data-i18n="analytics">ANALYSIS</small>
     <h2 data-i18n="areaOverview">Time-series analysis</h2>
-    <div class="analysis-controls">
-      <label for="analysisScope">Territory</label>
-      <select id="analysisScope"><option value="region">Whole region</option><option value="municipality">Selected municipality</option></select>
-      <label for="analysisProduct">Indicator</label>
-      <select id="analysisProduct"><option value="lulc">LULC area (ha)</option><option value="biomass">Above-ground biomass</option><option value="ndvi">NDVI</option></select>
-      <label id="analysisClassLabel">Culture / class</label>
-      <div id="analysisClassMultiSelect" class="multi-select" aria-describedby="analysisClassHint">
-        <button type="button" id="analysisClassToggle" class="multi-select-toggle">Select classes ▾</button>
-        <div class="multi-select-menu" role="group" aria-label="Select classes"></div>
-      </div>
-      <p id="analysisClassHint" class="control-hint">Select one or more classes from the dropdown.</p>
+    <div class="analysis-layout">
+      <div class="analysis-filter-panel">
+        <div class="analysis-controls">
+      <p class="analysis-select-instruction">Eine oder mehrere auswählen</p>
+      <label class="analysis-control-label">Municipalities</label>
+      <details class="analysis-dropdown" id="analysisRegionDropdown">
+        <summary id="analysisRegionSummary">Select municipalities ▾</summary>
+        <div id="analysisRegionSelect" class="analysis-region-select"></div>
+        <button type="button" id="analysisRegionAll" class="multi-select-all">Select all / Clear all</button>
+      </details>
+      <label for="analysisProduct" class="analysis-control-label">Indicator</label>
+      <select id="analysisProduct"><option value="lulc">LULC area (ha)</option><option value="ndvi">NDVI</option></select>
+      <label id="analysisClassLabel" class="analysis-control-label">Kultur / Klasse</label>
+      <details class="analysis-dropdown" id="analysisClassDropdown">
+        <summary id="analysisClassToggle">Klassen auswählen ▾</summary>
+        <div class="multi-select-menu analysis-region-select" role="group" aria-label="Select classes"></div>
+        <button type="button" id="analysisClassAll" class="multi-select-all">Alle auswählen / Auswahl aufheben</button>
+      </details>
       <select id="analysisClasses" multiple hidden aria-hidden="true" tabindex="-1"></select>
-    </div>
+        </div>
+        <label class="analysis-control-label">Year</label>
+    <details class="analysis-dropdown" id="analysisYearDropdown">
+      <summary id="analysisYearSummary">Select years ▾</summary>
+      <div id="analysisYearSelect" class="analysis-region-select"></div>
+      <button type="button" id="analysisYearAll" class="multi-select-all">Select all / Clear all</button>
+    </details>
+      </div>
+      <div class="analysis-plot-panel">
+    <div class="analysis-chart-header"></div>
     <div id="analysisChart" class="analysis-chart"></div>
+      <div class="analysis-export-footer"><button type="button" id="exportAnalysisCsv" class="secondary-button">Export CSV</button></div>
+      </div>
+    </div>
     <p id="analysisNote" class="muted">Area by selected LULC class and year.</p>
   </aside>
 </main>
 <footer class="funding">
-  <strong data-i18n="funding">Förderung</strong>
-  <p id="fundingText">Diese Arbeit wurde durch den Europäischen Fonds für regionale Entwicklung (EFRE) und das Land Sachsen-Anhalt im Rahmen des Programms „Sachsen-Anhalt WISSENSCHAFT – Forschung und Innovation (EFRE) 2021–2027“ im Projekt ReSeDiUm (Förderkennzeichen ZS/2023/12/182669) unterstützt.</p>
+  <div class="funding-copy"><strong data-i18n="funding">Förderung</strong>
+  <p id="fundingText">Diese Arbeit wurde durch den Europäischen Fonds für regionale Entwicklung (EFRE) und das Land Sachsen-Anhalt im Rahmen des Programms „Sachsen-Anhalt WISSENSCHAFT – Forschung und Innovation (EFRE) 2021–2027“ im Projekt ReSeDiUm (Förderkennzeichen ZS/2023/12/182669) unterstützt.</p></div>
+  <div class="funding-logos">
+    <img src="assets/eu_funding.png" alt="Finanziert von der Europäischen Union">
+    <img src="assets/efre.png" alt="EFRE">
+    <img src="assets/sachsen-anhalt.png" alt="Sachsen-Anhalt">
+  </div>
 </footer>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/pmtiles@4.5.0/dist/pmtiles.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
