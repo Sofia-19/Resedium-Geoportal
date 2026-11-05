@@ -146,5 +146,27 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/pmtiles@4.5.0/dist/pmtiles.js"></script>
 <script src="app.js"></script>
+
+<!-- ReSeDiUm AI assistant -->
+<div id="resedium-ai" class="resedium-ai">
+  <button id="ai-chat-toggle" class="ai-chat-toggle" type="button" aria-label="Open ReSeDiUm AI chat">
+    <span class="ai-chat-mark">✦</span><span>ReSeDiUm AI</span>
+  </button>
+  <section id="ai-chat-panel" class="ai-chat-panel" aria-label="ReSeDiUm AI assistant" hidden>
+    <header class="ai-chat-header">
+      <div><strong>ReSeDiUm AI</strong><small>Geoportal assistant</small></div>
+      <button id="ai-chat-close" type="button" aria-label="Close chat">×</button>
+    </header>
+    <div id="ai-chat-messages" class="ai-chat-messages" aria-live="polite">
+      <div class="ai-message ai-message-bot">Hallo! Ich bin ReSeDiUm AI. Frag mich gern zu den Kartenprodukten, NDVI, LULC oder zur Statistik — oder einfach zu einem anderen Thema.</div>
+    </div>
+    <form id="ai-chat-form" class="ai-chat-form">
+      <textarea id="ai-chat-input" rows="1" maxlength="4000" placeholder="Frag ReSeDiUm AI…" aria-label="Message"></textarea>
+      <button id="ai-chat-send" type="submit" aria-label="Send message">➤</button>
+    </form>
+    <div class="ai-chat-footnote">AI can make mistakes. Check important statistics against the source data.</div>
+  </section>
+</div>
+
 </body>
 </html>

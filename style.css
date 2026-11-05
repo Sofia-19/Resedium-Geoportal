@@ -199,3 +199,24 @@ header .brand small { letter-spacing: .08em; }
 }
 
 .analysis-export-footer { display:flex; justify-content:flex-end; margin:12px 0 0; }
+
+
+/* ReSeDiUm AI chat */
+.resedium-ai{position:fixed;right:22px;bottom:22px;z-index:2000;font-family:'DM Sans',sans-serif}
+.ai-chat-toggle{display:flex;align-items:center;gap:9px;border:0;border-radius:999px;background:#236b4b;color:#fff;padding:13px 18px;box-shadow:0 5px 22px #17251f30;font-size:13px}
+.ai-chat-mark{font-size:19px}
+.ai-chat-panel{position:absolute;right:0;bottom:62px;width:min(390px,calc(100vw - 28px));height:min(560px,calc(100vh - 110px));background:#fff;border:1px solid #dce6df;border-radius:16px;box-shadow:0 12px 40px #17251f35;display:flex;flex-direction:column;overflow:hidden}
+.ai-chat-panel[hidden]{display:none}
+.ai-chat-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#236b4b;color:white}
+.ai-chat-header strong{display:block;font-size:14px}.ai-chat-header small{display:block;color:#dbece1;font-size:10px;letter-spacing:.2px;margin-top:3px}
+.ai-chat-header button{border:0;background:transparent;color:white;font-size:25px;padding:0 4px}
+.ai-chat-messages{flex:1;overflow:auto;padding:14px;background:#f6f8f6;display:flex;flex-direction:column;gap:10px}
+.ai-message{max-width:90%;padding:10px 12px;border-radius:12px;font-size:13px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.ai-message-bot{align-self:flex-start;background:white;border:1px solid #e3e9e5;color:#17251f}
+.ai-message-user{align-self:flex-end;background:#236b4b;color:white}
+.ai-message-error{border-color:#f0c4c4;color:#9b2424}
+.ai-chat-form{display:flex;align-items:flex-end;gap:8px;padding:10px;border-top:1px solid #e3e9e5;background:white}
+.ai-chat-form textarea{flex:1;resize:none;max-height:120px;border:1px solid #dce4de;border-radius:10px;padding:10px;font:13px 'DM Sans',sans-serif;outline-color:#7da88b}
+.ai-chat-form button{width:40px;height:40px;border:0;border-radius:10px;background:#236b4b;color:white;font-size:17px}
+.ai-chat-footnote{padding:0 12px 9px;color:#849087;background:white;font-size:9px}
+@media(max-width:700px){.resedium-ai{right:12px;bottom:12px}.ai-chat-panel{position:fixed;right:8px;bottom:72px;width:calc(100vw - 16px);height:min(72vh,620px)}.ai-chat-toggle{padding:12px 15px}}

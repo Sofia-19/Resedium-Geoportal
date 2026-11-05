@@ -1342,3 +1342,83 @@ document.getElementById('analysisClasses')?.addEventListener('change', () => {
   updateSelectedProductStats();
   updateAnalytics();
 });
+
+// ---------------- ReSeDiUm AI assistant ----------------
+// Configure the public Cloudflare Worker URL after deploying worker.js.
+const RESEDIUM_AI_ENDPOINT = 'https://resedium-ai.sofi-drozd-13.workers.dev/api/chat';
+(function initReSeDiUmAI() {
+  const toggle = document.getElementById('ai-chat-toggle');
+  const panel = document.getElementById('ai-chat-panel');
+  const close = document.getElementById('ai-chat-close');
+  const form = document.getElementById('ai-chat-form');
+  const input = document.getElementById('ai-chat-input');
+  const messages = document.getElementById('ai-chat-messages');
+  if (!toggle || !panel || !form || !input || !messages) return;
+
+  const history = [];
+  let busy = false;
+  const openChat = () => { panel.hidden = false; toggle.setAttribute('aria-expanded','true'); input.focus(); };
+  const closeChat = () => { panel.hidden = true; toggle.setAttribute('aria-expanded','false'); };
+  toggle.addEventListener('click', () => panel.hidden ? openChat() : closeChat());
+  close?.addEventListener('click', closeChat);
+
+  function addMessage(text, role, extraClass='') {
+    const node = document.createElement('div');
+    node.className = `ai-message ${role === 'user' ? 'ai-message-user' : 'ai-message-bot'} ${extraClass}`;
+    node.textContent = text;
+    messages.appendChild(node);
+    messages.scrollTop = messages.scrollHeight;
+    return node;
+  }
+
+  function portalContext() {
+    const region = document.getElementById('regionName')?.textContent?.trim();
+    const product = document.getElementById('analysisProduct')?.value;
+    const yearsSelected = [...document.querySelectorAll('#analysisYearSelect input:checked')].map(el => el.value);
+    const classesSelected = [...document.querySelectorAll('#analysisClassDropdown input:checked')].map(el => el.value);
+    const language = document.documentElement.lang || (typeof window.language !== 'undefined' ? window.language : 'de');
+    return { selected_municipality: region && !/none selected|keine auswahl/i.test(region) ? region : null,
+      analytics_product: product || null, selected_years: yearsSelected, selected_classes: classesSelected, language };
+  }
+
+  async function sendMessage(message) {
+    if (busy) return;
+    busy = true;
+    const send = document.getElementById('ai-chat-send');
+    send.disabled = true;
+    const pending = addMessage('…', 'assistant');
+    try {
+      const response = await fetch(RESEDIUM_AI_ENDPOINT, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({message, history:history.slice(-10), portal_context:portalContext()})
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `Server error (${response.status})`);
+      pending.textContent = data.reply || 'No response received.';
+      history.push({role:'user',content:message},{role:'assistant',content:pending.textContent});
+      if (history.length > 12) history.splice(0,history.length-12);
+    } catch (error) {
+      pending.textContent = `Could not connect to ReSeDiUm AI. Check the Worker URL and deployment. (${error.message})`;
+      pending.classList.add('ai-message-error');
+    } finally {
+      busy = false;
+      send.disabled = false;
+      messages.scrollTop = messages.scrollHeight;
+    }
+  }
+
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    const message = input.value.trim();
+    if (!message || busy) return;
+    input.value = '';
+    input.style.height = 'auto';
+    addMessage(message,'user');
+    sendMessage(message);
+  });
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); form.requestSubmit(); }
+  });
+  input.addEventListener('input', () => { input.style.height='auto'; input.style.height=`${Math.min(input.scrollHeight,120)}px`; });
+})();
