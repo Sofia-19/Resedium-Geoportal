@@ -59,6 +59,29 @@ const map = L.map('map', {
 map.createPane('basemapPane');
 map.getPane('basemapPane').style.zIndex = 200;
 
+
+// The sidebar product order is also the map stacking order:
+// first product = lowest thematic layer; later products = higher layers.
+// Municipal/regional layers sit above all pixel/raster layers.
+const PRODUCT_STACK_ORDER = [
+  'lulc', 'forest', 'biomass', 'ndvi', 'permanent', 'conversion', 'crop'
+];
+function layerPaneName(config) {
+  const level = config.level === 'municipal' ? 'municipal' : 'pixel';
+  return `${level}-${config.product}`;
+}
+function ensureLayerPane(config) {
+  const paneName = layerPaneName(config);
+  if (!map.getPane(paneName)) {
+    const pane = map.createPane(paneName);
+    const productIndex = Math.max(0, PRODUCT_STACK_ORDER.indexOf(config.product));
+    // Pixel layers occupy z-index 300–399; municipality layers 500–599.
+    // Thus regional boundaries always overlay raster layers.
+    pane.style.zIndex = (config.level === 'municipal' ? 500 : 300) + productIndex * 10;
+  }
+  return paneName;
+}
+
 // Bing Maps requires a valid Bing Maps API key. Set it here (or expose it
 // through your deployment config) before publishing the portal.
 const BING_MAPS_KEY = 'YOUR_BING_MAPS_KEY';
@@ -1162,6 +1185,7 @@ function addMunicipalityLayer(config, year) {
     return null;
   }
   const layer = L.geoJSON(municipalityGeoJSON, {
+    pane: ensureLayerPane(config),
     style: feature => municipalityStyle(feature, config, year),
     onEachFeature: (feature, featureLayer) => {
       featureLayer.bindTooltip(getMunicipalityName(feature.properties || {}));
@@ -1192,8 +1216,9 @@ layer = pmtiles.leafletRasterLayer(archive, {
   // Zoom range supported by the map.
   minZoom: 0,
   maxZoom: 24,
-  // Thematic raster layers must render above Bing basemaps.
-  pane: 'overlayPane',
+  // Dedicated pane ensures product order matches the sidebar:
+  // LULC below Forest, then the following products.
+  pane: ensureLayerPane(config),
 
   // Actual native zoom range of this PMTiles file.
   minNativeZoom: header.minZoom,

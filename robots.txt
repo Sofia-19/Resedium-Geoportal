@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://sofia-19.github.io/Resedium-Geoportal/sitemap.xml
